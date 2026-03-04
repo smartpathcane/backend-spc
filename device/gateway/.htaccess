@@ -1,0 +1,13 @@
+# HTTP/HTTPS Gateway (.htaccess)
+# Disable automatic HTTP -> HTTPS redirection for this specific folder
+# so IoT devices without SSL support can still send data.
+
+RewriteEngine On
+
+# Stop processing rewrite rules from parent directories (like public/.htaccess)
+# that might try to force HTTPS
+RewriteOptions InheritDownBefore
+RewriteCond %{HTTPS} on
+# If you want to force HTTPS to HTTP *specifically* for requests to this gateway
+# (e.g. if the device gets confused by an HTTPS response):
+# RewriteRule ^(.*)$ http://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
