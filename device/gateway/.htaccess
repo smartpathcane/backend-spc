@@ -4,10 +4,19 @@
 
 RewriteEngine On
 
-# Stop processing rewrite rules from parent directories (like public/.htaccess)
-# that might try to force HTTPS
+# Stop processing rewrite rules from parent directories
 RewriteOptions InheritDownBefore
-RewriteCond %{HTTPS} on
-# If you want to force HTTPS to HTTP *specifically* for requests to this gateway
-# (e.g. if the device gets confused by an HTTPS response):
-# RewriteRule ^(.*)$ http://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+# Force hostinger to not redirect HTTP to HTTPS in this directory
+<IfModule mod_rewrite.c>
+    RewriteCond %{HTTPS} off
+    RewriteRule ^(.*)$ - [ENV=HTTPS:off]
+</IfModule>
+
+# If Hostinger's edge server specifically is forcing the redirect via an 'HTTPS: on' environment variable:
+SetEnvIf Request_URI "^/backend-spc/device/gateway/api/v1/live_location\.php$" HTTPS=off
+
+# Clear HSTS header if it was being set
+<IfModule mod_headers.c>
+    Header always unset Strict-Transport-Security
+</IfModule>
