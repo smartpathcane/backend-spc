@@ -9,51 +9,8 @@ ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 error_reporting(E_ALL);
 
-// Send CORS headers FIRST - before any other headers
-$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-$allowedOrigins = [
-    'https://smartpath-cane.netlify.app',
-    'http://localhost',
-    'http://127.0.0.1',
-    'https://*.netlify.app'
-];
-
-// Check if origin is allowed (including wildcards)
-$isAllowed = false;
-if (empty($origin)) {
-    $isAllowed = true;
-} else {
-    foreach ($allowedOrigins as $allowed) {
-        if (strpos($allowed, '*') !== false) {
-            $pattern = str_replace('*', '.*', preg_quote($allowed, '/'));
-            if (preg_match('/^' . $pattern . '$/', $origin)) {
-                $isAllowed = true;
-                break;
-            }
-        } elseif ($allowed === $origin) {
-            $isAllowed = true;
-            break;
-        }
-    }
-}
-
-// Always send CORS headers for allowed origins
-if ($isAllowed) {
-    header("Access-Control-Allow-Origin: {$origin}");
-    header('Access-Control-Allow-Credentials: true');
-} else {
-    // For debugging - log rejected origins
-    error_log("CORS rejected origin: {$origin}");
-}
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
-header('Access-Control-Max-Age: 86400');
-
-// Handle preflight requests immediately
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit();
-}
+require_once __DIR__ . '/../bootstrap/middleware/cors.php';
+handleCORS();
 
 // Set JSON headers AFTER CORS
 header('Content-Type: application/json');
@@ -81,9 +38,6 @@ set_exception_handler(function($e) {
     ]);
     exit;
 });
-
-// Load CORS middleware (for other functions)
-require_once __DIR__ . '/../bootstrap/middleware/cors.php';
 
 // Load database
 require_once __DIR__ . '/../database/database.php';
@@ -118,6 +72,10 @@ if (isset($_GET['path']) && !empty($_GET['path'])) {
         $prodBasePath = '/backend-spc/public';
         if (strpos($uri, $prodBasePath) === 0) {
             $path = substr($uri, strlen($prodBasePath));
+        } elseif (strpos($uri, '/public/') === 0) {
+            $path = substr($uri, strlen('/public'));
+        } elseif ($uri === '/public') {
+            $path = '/';
         } else {
             $path = $uri;
         }

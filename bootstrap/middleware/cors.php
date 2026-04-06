@@ -9,28 +9,37 @@
 $env = require __DIR__ . '/../config/env.php';
 
 /**
+ * True if Origin is any https site hosted on Netlify (*.netlify.app).
+ */
+function cors_is_netlify_origin(string $origin): bool {
+    return (bool) preg_match('#^https://[a-z0-9][a-z0-9.\-]*\.netlify\.app$#i', $origin);
+}
+
+/**
  * Handle CORS headers
  */
 function handleCORS(): void {
     global $env;
     
-    $allowedOrigins = explode(',', $env['CORS_ALLOWED_ORIGINS']);
+    $allowedOrigins = array_map('trim', explode(',', $env['CORS_ALLOWED_ORIGINS'] ?? '*'));
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
     
-    // Debug logging (remove in production)
-    error_log("CORS Debug - Origin: " . $origin);
-    error_log("CORS Debug - Allowed: " . json_encode($allowedOrigins));
+    $allow = false;
+    if (in_array('*', $allowedOrigins, true)) {
+        $allow = true;
+    } elseif ($origin !== '' && in_array($origin, $allowedOrigins, true)) {
+        $allow = true;
+    } elseif ($origin !== '' && cors_is_netlify_origin($origin)) {
+        $allow = true;
+    }
     
-    // Check if origin is allowed
-    if (in_array('*', $allowedOrigins)) {
-        header('Access-Control-Allow-Origin: *');
-    } elseif (in_array($origin, $allowedOrigins)) {
+    if ($allow && $origin !== '') {
         header("Access-Control-Allow-Origin: {$origin}");
         header('Access-Control-Allow-Credentials: true');
-    } else {
-        // Allow the specific Netlify origin for now
-        header('Access-Control-Allow-Origin: https://smartpath-cane.netlify.app');
-        header('Access-Control-Allow-Credentials: true');
+    } elseif ($allow && $origin === '' && in_array('*', $allowedOrigins, true)) {
+        header('Access-Control-Allow-Origin: *');
+    } elseif ($origin !== '') {
+        error_log('CORS rejected origin: ' . $origin);
     }
     
     // Set CORS headers
@@ -69,5 +78,4 @@ function successResponse(array $data = [], string $message = 'Success'): void {
     jsonResponse(['data' => $data, 'message' => $message, 'success' => true]);
 }
 
-// Apply CORS headers
-handleCORS();
+// CORS is applied by calling handleCORS() from public/index.php (single place, no duplicate headers).
