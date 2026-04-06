@@ -1,27 +1,14 @@
-# SmartPath Cane - Public Directory .htaccess
-# CORS Configuration for API endpoints
+# SmartPath Cane - Public Directory (.htaccess)
+# CORS is handled only in PHP (bootstrap/middleware/cors.php) so the response has a
+# single Access-Control-Allow-Origin that matches the browser's Origin. Duplicate or
+# wrong fixed origins here break fetch() from Netlify (maintenance /api/status, auth, etc.).
 
-# Enable rewrite engine
 RewriteEngine On
 
-# CORS Headers - Set for ALL requests
-<IfModule mod_headers.c>
-    Header always set Access-Control-Allow-Origin "https://smartpath-cane.netlify.app"
-    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
-    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
-    Header always set Access-Control-Allow-Credentials "true"
-    Header always set Access-Control-Max-Age "86400"
-</IfModule>
-
-# Handle CORS preflight OPTIONS request - return 200 immediately
-RewriteCond %{REQUEST_METHOD} OPTIONS
-RewriteRule ^ - [R=200,L]
-
-# Rewrite all requests to index.php (API routing)
+# Route API paths to index.php (no static files matched)
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^(.*)$ index.php [QSA,L]
 
-# PHP settings
 php_value display_errors 0
 php_value log_errors 1

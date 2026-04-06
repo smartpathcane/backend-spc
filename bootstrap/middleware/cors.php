@@ -22,6 +22,13 @@ function handleCORS(): void {
     global $env;
     
     $allowedOrigins = array_map('trim', explode(',', $env['CORS_ALLOWED_ORIGINS'] ?? '*'));
+    $fe = trim((string)($env['FRONTEND_URL'] ?? ''));
+    if ($fe !== '' && ($p = parse_url($fe)) && !empty($p['scheme']) && !empty($p['host'])) {
+        $feOrigin = $p['scheme'] . '://' . $p['host'] . (isset($p['port']) ? ':' . $p['port'] : '');
+        if ($feOrigin !== '://' && !in_array($feOrigin, $allowedOrigins, true)) {
+            $allowedOrigins[] = $feOrigin;
+        }
+    }
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
     
     $allow = false;
