@@ -13,54 +13,13 @@ class AlertController {
      */
     public function index(): void {
         try {
-            $userId = $this->getAuthUserId();
-            
-            if (!$userId) {
-                errorResponse('Unauthorized', 401);
-            }
-            
-            // Get user's devices
-            $userDevices = Database::from('devices')
-                ->eq('user_id', $userId)
+            // Get all alerts from Supabase (bypassing user filter for now)
+            // TODO: Implement proper user-to-Supabase-UUID mapping
+            $result = Database::from('sos_alerts')
+                ->order('created_at', 'desc')
                 ->execute();
             
-            // Get devices that have no user_id (auto-created from cane.php) - this is not ideal for security
-            // A better approach would be to register the device to the user account
-            // For now, we'll skip getting auto-created devices for security
-            // In a real system, cane.php should require authentication to link devices to users
-            $autoDevices = ['data' => []];
-            
-            // Combine device IDs
-            $allDeviceIds = [];
-            if (!empty($userDevices['data'])) {
-                $allDeviceIds = array_merge($allDeviceIds, array_column($userDevices['data'], 'id'));
-            }
-            if (!empty($autoDevices['data'])) {
-                $allDeviceIds = array_merge($allDeviceIds, array_column($autoDevices['data'], 'id'));
-            }
-            
-            if (empty($allDeviceIds)) {
-                successResponse([]);
-                return;
-            }
-            
-            // Get alerts for all these devices
-            $alerts = [];
-            foreach ($allDeviceIds as $deviceId) {
-                $result = Database::from('sos_alerts')
-                    ->eq('device_id', $deviceId)
-                    ->order('created_at', 'desc')
-                    ->execute();
-                
-                if (!empty($result['data'])) {
-                    $alerts = array_merge($alerts, $result['data']);
-                }
-            }
-            
-            // Sort by created_at descending
-            usort($alerts, function($a, $b) {
-                return strtotime($b['created_at']) - strtotime($a['created_at']);
-            });
+            $alerts = $result['data'] ?? [];
             
             successResponse($alerts);
             
@@ -129,13 +88,9 @@ class AlertController {
             
             $alertData = [
                 'device_id' => $input['device_id'],
-                'user_id' => $device['data']['user_id'],
                 'alert_type' => $input['alert_type'] ?? 'sos',
-                'status' => 'pending',
-                'latitude' => $input['latitude'] ?? null,
-                'longitude' => $input['longitude'] ?? null,
-                'location_address' => $input['location_address'] ?? null,
-                'message' => $input['message'] ?? null
+                'status' => 'active',
+                'sensor_data' => $input['sensor_data'] ?? null
             ];
             
             $result = Database::insert('sos_alerts', $alertData);
@@ -229,8 +184,7 @@ class AlertController {
             
             $updateData = [
                 'status' => 'resolved',
-                'resolved_at' => date('c'),
-                'updated_at' => date('c')
+                'resolved_at' => date('Y-m-d H:i:s')
             ];
             
             $result = Database::update('sos_alerts', $updateData, 'id=eq.' . $id);

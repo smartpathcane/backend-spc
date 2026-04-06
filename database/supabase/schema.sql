@@ -114,29 +114,27 @@ CREATE POLICY "Users can view device live locations" ON live_locations
 
 -- =====================================================
 -- 5. SOS ALERTS TABLE
+-- Location is obtained via JOIN to live_locations using device_id
+-- SOS is triggered by MPU6050 sensor (fall/impact detection)
 -- =====================================================
 CREATE TABLE IF NOT EXISTS sos_alerts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     device_id UUID NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
-    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-    alert_type VARCHAR(20) DEFAULT 'sos' CHECK (alert_type IN ('sos', 'fall', 'battery_low', 'geofence_exit')),
-    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'acknowledged', 'resolved', 'cancelled')),
-    latitude DECIMAL(10, 8),
-    longitude DECIMAL(11, 8),
-    location_address TEXT,
-    message TEXT,
-    acknowledged_by UUID REFERENCES users(id) ON DELETE SET NULL,
-    acknowledged_at TIMESTAMPTZ,
+    alert_type VARCHAR(20) DEFAULT 'fall' CHECK (alert_type IN ('sos', 'fall')),
+    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'resolved')),
+    sensor_data JSONB,
+    resolved_by UUID REFERENCES users(id) ON DELETE SET NULL,
     resolved_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Comment for sensor_data column
+COMMENT ON COLUMN sos_alerts.sensor_data IS 'MPU6050 sensor readings at time of alert (accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z)';
+
 -- Indexes for sos_alerts
 CREATE INDEX idx_sos_device_id ON sos_alerts(device_id);
-CREATE INDEX idx_sos_user_id ON sos_alerts(user_id);
 CREATE INDEX idx_sos_status ON sos_alerts(status);
-CREATE INDEX idx_sos_alert_type ON sos_alerts(alert_type);
 CREATE INDEX idx_sos_created_at ON sos_alerts(created_at);
 
 -- =====================================================
@@ -273,9 +271,13 @@ CREATE POLICY "Users can view device locations" ON locations
         )
     ));
 
--- SOS Alerts: Users can only see their own alerts
+-- SOS Alerts: Users can view alerts for their devices
 CREATE POLICY "Users can view own alerts" ON sos_alerts
-    FOR SELECT USING (user_id IN (SELECT id FROM users WHERE auth_uid = auth.uid()));
+    FOR SELECT USING (device_id IN (
+        SELECT id FROM devices WHERE user_id IN (
+            SELECT id FROM users WHERE auth_uid = auth.uid()
+        )
+    ));
 
 -- Geofences: Users can only see their own geofences
 CREATE POLICY "Users can view own geofences" ON geofences

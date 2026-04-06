@@ -47,29 +47,49 @@ class AuthController {
             $authResult = Database::authSignUp($input['email'], $input['password'], $metadata);
             
             if ($authResult['status'] >= 400) {
-                $errorMsg = $authResult['data']['error_description'] ?? $authResult['data']['message'] ?? json_encode($authResult['data']) ?? 'Registration failed';
-                errorResponse($errorMsg, 400);
+                $data = $authResult['data'];
+                $errorMsg = $data['error_description'] ?? $data['msg'] ?? $data['message'] ?? 'Registration failed';
+                
+                // Handle specific Supabase error codes
+                if (isset($data['error_code']) && $data['error_code'] === 'over_email_send_rate_limit') {
+                    $errorMsg = 'Too many requests. Please wait a few minutes before trying again.';
+                }
+                
+                errorResponse($errorMsg, $authResult['status']);
             }
             
-            $supabaseUid = $authResult['data']['user']['id'] ?? null;
+            // Check if confirmation is required (session will be null if confirmation is enabled)
+            $session = $authResult['data']['session'] ?? null;
+            $confirmationPending = empty($session);
             
-            // Create user in database (NO password_hash - Supabase Auth handles it)
+            // Still create profile even if pending
             $userData = [
                 'auth_uid' => $supabaseUid,
                 'username' => $this->generateUsername($input['email']),
                 'email' => $input['email'],
                 'first_name' => $input['fullname'] ?? '',
                 'role' => 'user',
-                'status' => 'active'
+                'status' => $confirmationPending ? 'pending' : 'active'
             ];
             
             $result = Database::insert('users', $userData);
             
             if ($result['status'] >= 400) {
+                // If user profile fails but auth succeeded, we might want to log this
+                // but registration technically happened in Supabase.
                 errorResponse('Failed to create user profile: ' . json_encode($result['data']), 500);
             }
             
-            // Generate JWT
+            // If confirmation is pending, don't issue JWT yet
+            if ($confirmationPending) {
+                successResponse([
+                    'confirmation_pending' => true,
+                    'email' => $input['email']
+                ], 'Registration successful. Please check your email to confirm your account.');
+                return;
+            }
+            
+            // Generate JWT for immediate login if confirmation is disabled
             $token = $this->generateJWT($result['data'][0]['id'] ?? null, $input['email']);
             
             successResponse([

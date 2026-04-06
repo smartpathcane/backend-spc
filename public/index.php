@@ -152,7 +152,8 @@ switch (true) {
             'name' => 'SmartPath Cane API',
             'version' => '1.0.0',
             'status' => 'running',
-            'timestamp' => date('c')
+            'timestamp' => date('c'),
+            'maintenance' => ($env['MAINTENANCE_MODE'] ?? false) === true,
         ];
         
         // Only show endpoints in development
@@ -183,6 +184,14 @@ switch (true) {
         }
         
         jsonResponse($response);
+        break;
+
+    // Public app status (for frontend maintenance gate; no auth)
+    case $path === '/api/status' && $method === 'GET':
+        jsonResponse([
+            'maintenance' => ($env['MAINTENANCE_MODE'] ?? false) === true,
+            'message' => (string)($env['MAINTENANCE_MESSAGE'] ?? 'We are temporarily unavailable. Please try again later.'),
+        ]);
         break;
         
     // Auth Routes
