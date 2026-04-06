@@ -189,7 +189,7 @@ if ($action) {
             border: 1px solid #ccc;
             padding: 10px;
             margin-top: 20px;
-            background: #fafafa;
+            background:rgba(250, 250, 250, 0.97);
         }
         .log-entry {
             border-bottom: 1px solid #eee;
